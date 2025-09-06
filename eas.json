@@ -4,6 +4,8 @@
   },
   "build": {
     "debug-apk": {
+      "developmentClient": true,
+      "distribution": "internal",
       "android": {
         "gradleCommand": ":app:assembleDebug"
       }
