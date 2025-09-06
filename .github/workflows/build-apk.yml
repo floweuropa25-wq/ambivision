@@ -9,46 +9,39 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 20
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Install EAS CLI
         run: npm install -g eas-cli
 
-      - name: Create eas.json
-        run: |
-          cat > eas.json <<'EOF'
-          {
-            "cli": {
-              "version": ">= 3.0.0"
-            },
-            "build": {
-              "release-apk": {
-                "android": {
-                  "buildType": "apk"
-                }
-              }
-            }
-          }
-          EOF
-
-      - name: Build release APK
+      - name: Build (EAS cloud)
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          eas build -p android --profile release-apk --non-interactive --json > build.json
+          # Usa el perfil que ya tienes en eas.json dentro del repo.
+          # Ejemplo de perfil:
+          # {
+          #   "build": { "production-apk": { "android": { "buildType": "apk" } } }
+          # }
+          eas build -p android --profile production-apk --non-interactive --json > build.json
 
-      - name: Download APK
+      - name: Resolve artifact URL robustly
         run: |
           sudo apt-get update && sudo apt-get install -y jq curl
-          URL=$(jq -r '.artifacts.buildUrl' build.json)
-          mkdir -p dist && curl -L "$URL" -o dist/AmbiVision-release.apk
+          # Si el JSON de 'eas build' no trae URL directa, consulta el último build terminado.
+          URL=$(jq -r '.artifacts.buildUrl // empty' build.json)
+          if [ -z "$URL" ]; then
+            URL=$(eas build:list --platform android --status finished --limit 1 --json | jq -r '.[0].artifacts.buildUrl')
+          fi
+          mkdir -p dist && curl -L "$URL" -o dist/app-release.apk
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AmbiVision-release-apk
-          path: dist/AmbiVision-release.apk
+          name: app-release-apk
+          path: dist/app-release.apk
