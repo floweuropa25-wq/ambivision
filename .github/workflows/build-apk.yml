@@ -1,24 +1,54 @@
 name: build-apk
 on:
   workflow_dispatch:
-  push: { branches: [ main ] }   # así también se ejecuta al hacer commit
+
 jobs:
   android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: npm i -g eas-cli
-      - name: Build debug APK
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install EAS CLI
+        run: npm install -g eas-cli
+
+      - name: Create eas.json
+        run: |
+          cat > eas.json <<'EOF'
+          {
+            "cli": {
+              "version": ">= 3.0.0"
+            },
+            "build": {
+              "release-apk": {
+                "android": {
+                  "buildType": "apk"
+                }
+              }
+            }
+          }
+          EOF
+
+      - name: Build release APK
         env:
           EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
         run: |
-          eas build -p android --profile debug-apk --non-interactive --json > build.json
+          eas build -p android --profile release-apk --non-interactive --json > build.json
+
       - name: Download APK
         run: |
           sudo apt-get update && sudo apt-get install -y jq curl
-          URL=$(jq -r '.artifacts.buildUrl // .[0].artifacts.buildUrl' build.json)
-          mkdir -p dist && curl -L "$URL" -o dist/AmbiVision-debug.apk
+          URL=$(jq -r '.artifacts.buildUrl' build.json)
+          mkdir -p dist && curl -L "$URL" -o dist/AmbiVision-release.apk
+
       - uses: actions/upload-artifact@v4
         with:
-          name: AmbiVision-debug-apk
-          path: dist/AmbiVision-debug.apk
+          name: AmbiVision-release-apk
+          path: dist/AmbiVision-release.apk
